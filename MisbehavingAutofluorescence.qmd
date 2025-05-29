@@ -1,5 +1,5 @@
 ---
-title: "Let's talk about Autofluorescence!"
+title: "Misbehaving Autofluorescence"
 format: html
 ---
 
@@ -24,7 +24,7 @@ OperatingSystem <- Sys.info()["sysname"]
 if(OperatingSystem == "Linux"){ OS <- Linux
 } else if (OperatingSystem == "Windows"){OS <- Windows}
 
-Folder <- file.path(OS, "AutofluorescencePaper")
+Folder <- file.path(OS, "CVD6022_Autofluorescence")
 FlowJo <- list.files(Folder, pattern=".wsp", full.names=TRUE)
 FlowJo
 ```
@@ -261,4 +261,6 @@ CosinePlot <- Luciernaga_Cosine(data=BigCosine,
  colorlow="skyblue1", colorhigh="tan1", legend=TRUE)
 CosinePlot
 ```
+
+
 
