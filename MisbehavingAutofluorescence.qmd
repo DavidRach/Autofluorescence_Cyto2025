@@ -1,0 +1,266 @@
+---
+title: "Misbehaving Autofluorescence"
+format: html
+---
+
+```{r}
+#| code-fold: show
+library(flowCore)
+library(flowWorkspace)
+library(CytoML)
+library(Luciernaga)
+library(dplyr)
+library(purrr)
+```
+
+
+```{r}
+#| code-fold: show
+Linux <- file.path("/media", "david", "DavidRach")
+Windows <- file.path("F:")
+
+OperatingSystem <- Sys.info()["sysname"]
+
+if(OperatingSystem == "Linux"){ OS <- Linux
+} else if (OperatingSystem == "Windows"){OS <- Windows}
+
+Folder <- file.path(OS, "CVD6022_Autofluorescence")
+FlowJo <- list.files(Folder, pattern=".wsp", full.names=TRUE)
+FlowJo
+```
+
+```{r}
+#| code-fold: show
+ws <- open_flowjo_xml(FlowJo[1])
+system.time({gs <- flowjo_to_gatingset(ws, path = Folder, keywords = "GROUPNAME")})
+plot(gs)
+pData(gs)
+```
+
+
+```{r}
+#| code-fold: show
+Monocytes <- gs_pop_get_data(gs, "Monocytes", inverse.transform=TRUE)
+MonocytesData <- data.frame(exprs(Monocytes[[1]]), check.names=FALSE)
+MonocytesData <- MonocytesData[,-grep("Time|FS|SC|SS|Original|W$|H$", names(MonocytesData))]
+MonocytesAverageSignature <- AveragedSignature(MonocytesData, stats="median")
+MonocytesAverageSignature <- MonocytesAverageSignature |> mutate(Sample="Monocytes") |>
+ relocate(Sample, .before=1)
+
+Lymphocytes <- gs_pop_get_data(gs, "Lymphocytes", inverse.transform=TRUE)
+LymphocytesData <- data.frame(exprs(Lymphocytes[[1]]), check.names=FALSE)
+LymphocytesData <- LymphocytesData[,-grep("Time|FS|SC|SS|Original|W$|H$", names(LymphocytesData))]
+LymphocytesAverageSignature <- AveragedSignature(LymphocytesData, stats="median")
+LymphocytesAverageSignature <- LymphocytesAverageSignature |> mutate(Sample="Lymphocytes") |>
+ relocate(Sample, .before=1)
+
+Debris <- gs_pop_get_data(gs, "Debris", inverse.transform=TRUE)
+DebrisData <- data.frame(exprs(Debris[[1]]), check.names=FALSE)
+DebrisData <-DebrisData[,-grep("Time|FS|SC|SS|Original|W$|H$", names(DebrisData))]
+DebrisAverageSignature <- AveragedSignature(DebrisData, stats="median")
+DebrisAverageSignature <- DebrisAverageSignature |> mutate(Sample="Debris") |>
+ relocate(Sample, .before=1)
+
+Doublets <- gs_pop_get_data(gs, "Doublets", inverse.transform=TRUE)
+DoubletsData <- data.frame(exprs(Doublets[[1]]), check.names=FALSE)
+DoubletsData <- DoubletsData[,-grep("Time|FS|SC|SS|Original|W$|H$", names(DoubletsData))]
+DoubletsAverageSignature <- AveragedSignature(DoubletsData, stats="median")
+DoubletsAverageSignature <- DoubletsAverageSignature |> mutate(Sample="Doublets") |>
+ relocate(Sample, .before=1)
+
+Data <- bind_rows(MonocytesAverageSignature, LymphocytesAverageSignature, DebrisAverageSignature, DoubletsAverageSignature)
+
+colnames(Data) <- gsub("Comp-", "", colnames(Data))
+Data
+```
+
+### Figure 1. A & B 
+The averaged signature by cell population shows that monocytes and doublets are brighter in MFI compared to both lymphocytes and debris event MFI. The normalized signatures however appear remarkably similar. 
+
+```{r}
+#| code-fold: show
+RawMFI <- QC_ViewSignature(x=c("Monocytes", "Lymphocytes", "Debris", "Doublets"), data=Data, Normalize=FALSE)
+
+NormalizedMFI <- QC_ViewSignature(x=c("Monocytes", "Lymphocytes", "Debris", "Doublets"), data=Data, Normalize=TRUE)
+```
+
+```{r}
+removestrings <-  c(".fcs")
+FileLocation <- system.file("extdata", package = "Luciernaga")
+pattern = "AutofluorescentOverlaps.csv"
+AFOverlap <- list.files(path=FileLocation, pattern=pattern, full.names = TRUE)
+```
+
+```{r}
+Lymphocytes_Report <- map(.x=gs[[1]], .f=Luciernaga_QC, subsets="Lymphocytes",
+ removestrings=removestrings, sample.name="GROUPNAME", unmixingcontroltype = "cells",
+ Unstained = TRUE, ratiopopcutoff = 0.001, Verbose = FALSE, AFOverlap = AFOverlap,
+ stats = "median", ExportType = "data", SignatureReturnNow = FALSE,
+ outpath = Folder, Increments=0.1, SecondaryPeaks=2,
+ experiment = "Test", condition = "Test", Subtraction = "Internal",
+ CellAF=NULL, SCData="subtracted", NegativeType="default", inverse.transform=TRUE) %>% bind_rows()
+
+Lymphocytes_Report$Cluster <- gsub("Comp-", "",  Lymphocytes_Report$Cluster)
+
+ThePlots <- Luciernaga_Plots(data=Lymphocytes_Report, RetainedType="normalized",
+ CellPopRatio=0.001, outfolder=NULL, filename="LuciernagaReport", returntype="plots",
+ LinePlots=FALSE, CosinePlots=FALSE, StackedBarPlots = FALSE, HeatmapPlots = TRUE,
+ reference = NULL)
+
+
+CosineData <- Lymphocytes_Report |> select(-Sample, -Experiment, -Condition) 
+Cutoff <- sum(CosineData$Count)*0.05
+CosineData <- CosineData |> filter(Count > Cutoff)
+
+RawPlot <- QC_Amalgamate(data=CosineData, samplecolumn="Cluster", normalize=FALSE,
+ countcolumn="Count", returnType="plot", titlename=NULL, linecolor="blue", legend=FALSE)
+
+NormalizedPlot <- QC_Amalgamate(data=CosineData, samplecolumn="Cluster", normalize=TRUE,
+ countcolumn="Count", returnType="plot", titlename=NULL, linecolor="blue", legend=FALSE)
+
+CosineData <- CosineData |> select(-Count)
+
+CosinePlot <- Luciernaga_Cosine(data=CosineData,
+ returntype="plot", rearrange=TRUE, limitlow=0.90, limithigh=1,
+ colorlow="navajowhite", colorhigh="tan1", legend=TRUE)
+CosinePlot
+```
+
+```{r}
+Monocytes_Report <- map(.x=gs[[1]], .f=Luciernaga_QC, subsets="Monocytes",
+ removestrings=removestrings, sample.name="GROUPNAME", unmixingcontroltype = "cells",
+ Unstained = TRUE, ratiopopcutoff = 0.001, Verbose = FALSE, AFOverlap = AFOverlap,
+ stats = "median", ExportType = "data", SignatureReturnNow = FALSE,
+ outpath = Folder, Increments=0.1, SecondaryPeaks=2,
+ experiment = "Test", condition = "Test", Subtraction = "Internal",
+ CellAF=NULL, SCData="subtracted", NegativeType="default", inverse.transform=TRUE) %>% bind_rows()
+
+Monocytes_Report$Cluster <- gsub("Comp-", "",  Monocytes_Report$Cluster)
+
+ThePlots <- Luciernaga_Plots(data=Monocytes_Report, RetainedType="normalized",
+ CellPopRatio=0.001, outfolder=NULL, filename="LuciernagaReport", returntype="plots",
+ LinePlots=FALSE, CosinePlots=FALSE, StackedBarPlots = FALSE, HeatmapPlots = TRUE,
+ reference = NULL)
+
+CosineData <- Monocytes_Report |> select(-Sample, -Experiment, -Condition) 
+Cutoff <- sum(CosineData$Count)*0.01
+CosineData <- CosineData |> filter(Count > Cutoff)
+
+RawPlot <- QC_Amalgamate(data=CosineData, samplecolumn="Cluster", normalize=FALSE,
+ countcolumn="Count", returnType="plot", titlename=NULL, linecolor="blue", legend=FALSE)
+
+NormalizedPlot <- QC_Amalgamate(data=CosineData, samplecolumn="Cluster", normalize=TRUE,
+ countcolumn="Count", returnType="plot", titlename=NULL, linecolor="blue", legend=FALSE)
+
+CosineData <- CosineData |> select(-Count)
+
+CosinePlot <- Luciernaga_Cosine(data=CosineData,
+ returntype="plot", rearrange=TRUE, limitlow=0.90, limithigh=1,
+ colorlow="navajowhite", colorhigh="tan1", legend=TRUE)
+CosinePlot
+```
+
+```{r}
+Doublets_Report <- map(.x=gs[[1]], .f=Luciernaga_QC, subsets="Doublets",
+ removestrings=removestrings, sample.name="GROUPNAME", unmixingcontroltype = "cells",
+ Unstained = TRUE, ratiopopcutoff = 0.001, Verbose = FALSE, AFOverlap = AFOverlap,
+ stats = "median", ExportType = "data", SignatureReturnNow = FALSE,
+ outpath = Folder, Increments=0.1, SecondaryPeaks=2,
+ experiment = "Test", condition = "Test", Subtraction = "Internal",
+ CellAF=NULL, SCData="subtracted", NegativeType="default", inverse.transform=TRUE) %>% bind_rows()
+
+Doublets_Report$Cluster <- gsub("Comp-", "",  Doublets_Report$Cluster)
+
+ThePlots <- Luciernaga_Plots(data=Doublets_Report, RetainedType="normalized",
+ CellPopRatio=0.001, outfolder=NULL, filename="LuciernagaReport", returntype="plots",
+ LinePlots=FALSE, CosinePlots=FALSE, StackedBarPlots = FALSE, HeatmapPlots = TRUE,
+ reference = NULL)
+
+CosineData <- Doublets_Report |> select(-Sample, -Experiment, -Condition) 
+Cutoff <- sum(CosineData$Count)*0.01
+CosineData <- CosineData |> filter(Count > Cutoff)
+
+RawPlot <- QC_Amalgamate(data=CosineData, samplecolumn="Cluster", normalize=FALSE,
+ countcolumn="Count", returnType="plot", titlename=NULL, linecolor="blue", legend=FALSE)
+
+NormalizedPlot <- QC_Amalgamate(data=CosineData, samplecolumn="Cluster", normalize=TRUE,
+ countcolumn="Count", returnType="plot", titlename=NULL, linecolor="blue", legend=FALSE)
+
+CosineData <- CosineData |> select(-Count)
+
+CosinePlot <- Luciernaga_Cosine(data=CosineData,
+ returntype="plot", rearrange=TRUE, limitlow=0.95, limithigh=1,
+ colorlow="navajowhite", colorhigh="tan1", legend=TRUE)
+CosinePlot
+```
+
+```{r}
+Debris_Report <- map(.x=gs[[1]], .f=Luciernaga_QC, subsets="Debris",
+ removestrings=removestrings, sample.name="GROUPNAME", unmixingcontroltype = "cells",
+ Unstained = TRUE, ratiopopcutoff = 0.001, Verbose = FALSE, AFOverlap = AFOverlap,
+ stats = "median", ExportType = "data", SignatureReturnNow = FALSE,
+ outpath = Folder, Increments=0.1, SecondaryPeaks=2,
+ experiment = "Test", condition = "Test", Subtraction = "Internal",
+ CellAF=NULL, SCData="subtracted", NegativeType="default", inverse.transform=TRUE) %>% bind_rows()
+
+Debris_Report$Cluster <- gsub("Comp-", "",  Debris_Report$Cluster)
+
+ThePlots <- Luciernaga_Plots(data=Debris_Report, RetainedType="normalized",
+ CellPopRatio=0.001, outfolder=NULL, filename="LuciernagaReport", returntype="plots",
+ LinePlots=FALSE, CosinePlots=FALSE, StackedBarPlots = FALSE, HeatmapPlots = TRUE,
+ reference = NULL)
+
+
+CosineData <- Debris_Report |> select(-Sample, -Experiment, -Condition) 
+Cutoff <- sum(CosineData$Count)*0.05
+CosineData <- CosineData |> filter(Count > Cutoff)
+
+RawPlot <- QC_Amalgamate(data=CosineData, samplecolumn="Cluster", normalize=FALSE,
+ countcolumn="Count", returnType="plot", titlename=NULL, linecolor="blue", legend=FALSE)
+
+NormalizedPlot <- QC_Amalgamate(data=CosineData, samplecolumn="Cluster", normalize=TRUE,
+ countcolumn="Count", returnType="plot", titlename=NULL, linecolor="blue", legend=FALSE)
+
+CosineData <- CosineData |> select(-Count)
+
+CosinePlot <- Luciernaga_Cosine(data=CosineData,
+ returntype="plot", rearrange=TRUE, limitlow=0.90, limithigh=1,
+ colorlow="navajowhite", colorhigh="tan1", legend=TRUE)
+CosinePlot
+```
+
+```{r}
+Lymphocytes_Report <- Lymphocytes_Report |> mutate(Condition="Lymphocytes")
+Monocytes_Report <- Monocytes_Report |> mutate(Condition="Monocytes")
+Monocytes_Report$Cluster <- gsub("UV7", "UV8", Monocytes_Report$Cluster)
+Doublets <- Doublets_Report |> mutate(Condition="Doublets")
+Debris_Report <- Debris_Report |> mutate(Condition="Debris")
+AllPops <- bind_rows(Lymphocytes_Report, Monocytes_Report, Doublets, Debris_Report)
+
+AllPops
+
+plot <- Luciernaga_GroupHeatmap(reports=AllPops, nameColumn="Condition",
+ cutoff=0.01, returntype="plot")
+
+ggplot2::ggsave(filename = "AllPops.png", plot = plot,
+  width = 16, height = 8, units = "in", dpi = 300, bg = "white")
+
+data <- Luciernaga_GroupHeatmap(reports=AllPops, nameColumn="Condition",
+ cutoff=0.01, returntype="data")
+ 
+These <- data |> select(Cluster) |> filter(!Cluster %in% "Other") |>
+    pull(Cluster) |> unique()
+
+BigCosine <- AllPops |> filter(Cluster %in% These) |> group_by(Cluster) |>
+     slice(1) |> ungroup() |> select(-Sample, -Experiment, -Condition, -Count)
+
+colnames(BigCosine) <- gsub("Comp-", "", colnames(BigCosine))
+
+CosinePlot <- Luciernaga_Cosine(data=BigCosine,
+ returntype="plot", rearrange=TRUE, limitlow=0.90, limithigh=1,
+ colorlow="skyblue1", colorhigh="tan1", legend=TRUE)
+CosinePlot
+```
+
+
+
