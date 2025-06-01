@@ -1,6 +1,6 @@
 # Autofluorescence Cyto 2025
 
-<img src="https://github.com/DavidRach/Autofluorescence_Cyto2025/blob/main/AutofluorescencePoster.svg" >
+<img src="https://github.com/DavidRach/Autofluorescence_Cyto2025/blob/main/AutofluorescencePoster.png" >
 
 This repository is for our '“Are these autofluorescences in the room with us right now?” Quantifying impact of autofluorescence variation on unmixing' poster. It contains the data and R code needed to hopefully reproduce our analysis and figures, as well as the .svg files used to create the figures in Inkscape.
 
