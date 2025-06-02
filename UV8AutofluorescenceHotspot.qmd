@@ -69,6 +69,15 @@ MyPanel <- c("BUV395", "BUV563", "BUV615", "BUV661", "BUV737",
      "PE-Vio 770", "PE-Fire 810", "APC", "Alexa Fluor 647",
       "Zombie NIR", "APC-R700", "APC-Fire 750", "APC-Fire 810")
 
+Plots <- QC_ReferenceLibrary(FluorNameContains = MyPanel, returnPlots=TRUE, NumberDetectors=64, legend=FALSE)
+
+Plots <- Plots[[2]]
+FileName <- paste0("ThePlots", ".png")
+FinalLocation <- file.path(StorageLocation, FileName)
+ggsave(filename = FinalLocation, Plots, dpi = 600, width = 4, height = 3)
+
+
+
 Checking <- CosineData |> select(-Sample)
 
 HotspotBasePlot <- Luciernaga:::MagesCauldron(panelfluors=MyPanel,

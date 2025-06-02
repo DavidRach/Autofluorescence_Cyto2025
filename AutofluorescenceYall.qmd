@@ -83,6 +83,12 @@ The averaged signature by cell population shows that monocytes and doublets are 
 
 ```{r}
 #| code-fold: show
+NormalizedMFI <- QC_ViewSignature(x=c("Monocytes"), data=Data, Normalize=TRUE, legend=FALSE)
+
+FileName <- paste0("NormalizedSingle", ".png")
+FinalLocation <- file.path(StorageLocation, FileName)
+ggsave(filename = FinalLocation, NormalizedMFI, dpi = 600, width = 4, height = 3)
+
 RawMFI <- QC_ViewSignature(x=c("Monocytes", "Lymphocytes", "Debris", "Doublets"), data=Data, Normalize=FALSE)
 
 FileName <- paste0("RawMFIAll", ".png")
