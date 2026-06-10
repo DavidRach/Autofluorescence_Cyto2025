@@ -4,6 +4,8 @@
 
 This repository is for our '“Are these autofluorescences in the room with us right now?” Quantifying impact of autofluorescence variation on unmixing' poster. It contains the data and R code needed to hopefully reproduce our analysis and figures, as well as the .svg files used to create the figures in Inkscape.
 
+Click Here for the [poster](/AutofluorescencePoster.pdf)
+
 ## Organization
 
 The .csv files for the respective analyses are stored in the data folder, from which they can be accessed by the code. The code is contained within the Quarto Markdown (.qmd) files named after the respective figure. The .svg files can be opened with Inkscape to access the Figure assembly layout. 
