@@ -30,7 +30,7 @@ We found that the majority of the autofluorescence signatures within human monon
 Our work highlights variation in autofluorescence signatures within human CBMC and PBMC cells activated with different stimuli, and established thresholds at which we observe impacts on the effect that unmixing controls had on resolving complex SFC panels. We provide a method by which shared variant autofluorescence signatures can be isolated and highlight the importance of collecting sufficient unstained cells to profile rarer variation in autofluorescence that might otherwise be missed.
 
 [Code](https://github.com/DavidRach/Autofluorescence_Cyto2025)
-[Poster](https://davidrach.github.io/Autofluorescence_Cyto2025/AutofluorescencePoster.pdf)   
+[Poster](/AutofluorescencePoster.pdf)   
 
 ## License
 
